@@ -113,7 +113,7 @@ class Phlickr_Request {
     }
 
     /**
-     * Submit a POST request with to the specified URL with given parameters.
+     * Submit an HTTP request with to the specified URL with given parameters.
      *
      * @param   string $url
      * @param   array $params An optional array of parameter name/value
@@ -129,18 +129,30 @@ class Phlickr_Request {
      * @uses    set_time_limit() to ensure that PHP's script timer is five
      *          seconds longer than the sum of $timeout and TIMEOUT_CONNECTION.
      */
-    static function submitHttpPost($url, $postParams = null, $timeout = self::TIMEOUT_TOTAL)
+    static function submitHttp($url, $method, $params = null, $timeout = self::TIMEOUT_TOTAL)
     {
+
         $ch = curl_init();
 
         // set up the request
-        curl_setopt($ch, CURLOPT_URL, $url);
         // make sure we submit this as a post
-        curl_setopt($ch, CURLOPT_POST, true);
-        if (isset($postParams)) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $postParams);
-        }else{
-            curl_setopt($ch, CURLOPT_POSTFIELDS, "");        	
+        if($method=="POST")
+        {
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            if (isset($params)) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+            }else{
+                curl_setopt($ch, CURLOPT_POSTFIELDS, "");           
+            }
+        } 
+        else 
+        {
+            if(strpos($url, '?')==false)
+                $url = $url . '?' . $params;
+            else
+                $url = $url . '&' . $params;
+            curl_setopt($ch, CURLOPT_URL, $url);
         }
         // make sure problems are caught
         curl_setopt($ch, CURLOPT_FAILONERROR, 1);
@@ -287,9 +299,32 @@ class Phlickr_Request {
             $this->getParams()
         );
         $params['method'] = $this->getMethod();
+        ksort($params);
 
-        return $api->getEndpointUrl() . '?'
-            . self::signParams($api->getSecret(), $params);
+        $params['oauth_signature'] = self::HMACSignParams([
+            'httpMethod'=>$api->getHTTPMethod(),
+            'endpoint'=>$api->getEndpointUrl(),
+            'params'=>$params,
+            'secret'=>$api->getSecret(), 
+            'tokenSecret'=>$api->getAuthTokenSecret(), 
+        ]);
+
+        return $api->getEndpointUrl() . '?' . http_build_query($params, null, '&');
+        // return $api->getEndpointUrl() . '?' . self::signParams($api->getSecret(), $params);
+    }
+
+    public static function HMACSignParams($variables)
+    {
+        $key = $variables['secret'] . '&' . $variables['tokenSecret'];
+
+        $signedArray = [
+            rawurlencode($variables['httpMethod']),
+            rawurlencode($variables['endpoint']),
+            rawurlencode(http_build_query($variables['params'], null, '&', PHP_QUERY_RFC3986)),
+        ];
+        $signee = implode('&', $signedArray);
+
+        return base64_encode(hash_hmac('sha1', $signee, $key, true));
     }
 
     /**
@@ -302,7 +337,7 @@ class Phlickr_Request {
      * @param   boolean $allowCached If a cached result exists, should it be returned?
      * @return  object Flicrk_Response
      * @throws  Phlickr_XmlParseException, Phlickr_ConnectionException
-     * @uses    submitHttpPost() to submit the request.
+     * @uses    submitHttp() to submit the request.
      * @uses    Phlickr_Cache to load and cached requests.
      * @uses    Phlickr_Response to return results.
      */
@@ -314,7 +349,7 @@ class Phlickr_Request {
         if ($allowCached && $cache->has($url)) {
             $result = $cache->get($url);
         } else {
-            $result = self::submitHttpPost($url);
+            $result = self::submitHttp($url, $this->getApi()->getHTTPMethod());
             $cache->set($url, $result);
         }
 //print "RESULT: $result\n";

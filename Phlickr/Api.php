@@ -65,7 +65,7 @@ class Phlickr_Api {
      * @var string
      * @see setEndpointUrl()
      */
-    const REST_ENDPOINT_URL = 'https://flickr.com/services/rest/';
+    const REST_ENDPOINT_URL = 'https://api.flickr.com/services/rest/';
     /**
      * The name of the API key label in the settings files created by saveAs()
      * and read by createFrom().
@@ -96,6 +96,21 @@ class Phlickr_Api {
     const SETTING_API_CACHE = 'cache_file';
 
     /**
+     * The API HTTP method we will use.
+     *
+     * @var string
+     * @see getHTTPMethod(), setHTTPMethod()
+     */
+    private $_http_method = 'GET';
+    /**
+     * The callback URL for Flickr.
+     *
+     * @var     string
+     * @since   0.2.3
+     * @see     getCallbackURL(), setCallbackURL()
+     */
+    private $_callback_url = '';
+    /**
      * A Flickr API key.
      *
      * To obtain one see http://flickr.com/services/api/misc.api_keys.html .
@@ -120,6 +135,14 @@ class Phlickr_Api {
      * @since   0.2.3
      */
     private $_token = null;
+    /**
+     * The access token's secret associated with a Flickr account.
+     *
+     * @var     string
+     * @see     getAuthTokenSecret()
+     * @since   0.2.3
+     */
+    private $_token_secret = null;
     /**
      * The Request Cache.
      *
@@ -346,6 +369,49 @@ class Phlickr_Api {
     }
 
     /**
+     * Get the HTTP Method we will be using.
+     *
+     * @return  string
+     * @see     __construct()
+     * @uses    Phlickr_Api::$_http_method Value is loaded from this variable.
+     */
+    public function getHTTPMethod() {
+        return $this->_http_method;
+    }
+    /**
+     * Set the HTTP method.
+     *
+     * @param   string $method
+     * @return  void
+     * @see     __construct(), getHTTPMethod()
+     */
+    public function setHTTPMethod($method) {
+        $allowedMethods = ['GET','POST','DELETE','HEAD','PATCH'];
+        if(!in_array(strtoupper($method), $allowedMethods))
+            throw new Phlickr_Exception('The HTTP method you supplied is invalid.');
+        $this->_http_method = (string) strtoupper($method);
+    }
+    /**
+     * Get the callback URL we will be using.
+     *
+     * @return  string
+     * @see     setCallbackURL()
+     * @uses    Phlickr_Api::$_callback_url Value is loaded from this variable.
+     */
+    public function getCallbackURL() {
+        return $this->_callback_url;
+    }
+    /**
+     * Set the callback URL.
+     *
+     * @param   string $callback_url
+     * @return  void
+     * @see     getCallbackURL()
+     */
+    public function setCallbackURL($callback_url) {
+        $this->_callback_url = (string) $callback_url;
+    }
+    /**
      * Get the API key.
      *
      * @return  string
@@ -387,6 +453,27 @@ class Phlickr_Api {
         $this->_token = (string) $token;
         // if the token changes the user has likely changed
         $this->_userId = null;
+    }
+    /**
+     * Return the token secret being used for authentication.
+     *
+     * @return  string
+     * @see     __construct(), setAuthToken(), setAuthTokenFromFrob()
+     * @todo    Deprecate and then rename this to getTokenSecret()
+     */
+    public function getAuthTokenSecret() {
+        return $this->_token_secret;
+    }
+    /**
+     * Set the Flickr authentication token secret.
+     *
+     * @param   string $token_secret
+     * @return  void
+     * @see     __construct(), getAuthToken(), setAuthTokenFromFrob()
+     * @todo    Deprecate and then rename this to setTokenSecret()
+     */
+    public function setAuthTokenSecret($token_secret) {
+        $this->_token_secret = (string) $token_secret;
     }
     /**
      * Set the auth token from a frob.
@@ -441,8 +528,8 @@ class Phlickr_Api {
     public function getUserId() {
         if (is_null($this->_userId)) {
             try {
-                $response = $this->executeMethod('flickr.auth.checkToken');
-                $this->_userId = (string) $response->xml->auth->user['nsid'];
+                $response = $this->executeMethod('flickr.auth.oauth.checkToken');
+                $this->_userId = (string) $response->xml->oauth->user['nsid'];
             } catch (Phlickr_Exception $ex) {
                 // invalid login (or connection problem)
                 $this->_userId = null;
@@ -458,9 +545,16 @@ class Phlickr_Api {
      * @see     Phlickr_Request::buildUrl()
      */
     public function getParamsForRequest() {
-        $params['api_key'] = $this->_key;
+        $params = [
+            'oauth_callback'=>$this->_callback_url,
+            'oauth_consumer_key'=>$this->_key,
+            'oauth_nonce'=>random_int(100, 300) . uniqid(),
+            'oauth_signature_method'=>'HMAC-SHA1',
+            'oauth_timestamp'=>time(),
+            'oauth_version'=>'1.0',
+        ];
         if (isset($this->_token)) {
-            $params['auth_token'] = $this->_token;
+            $params['oauth_token'] = $this->_token;
         }
         return $params;
     }

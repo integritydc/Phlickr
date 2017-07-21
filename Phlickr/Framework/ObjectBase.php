@@ -19,7 +19,7 @@
  * @package     Phlickr
  */
 
-abstract class Phlickr_Framework_ObjectBase implements Phlickr_Framework_IObjectBase {
+abstract class Phlickr_Framework_ObjectBase {
     /**
      * Reference to the API.
      *
