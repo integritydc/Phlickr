@@ -47,6 +47,13 @@ class Phlickr_PhotosetList extends Phlickr_Framework_ListBase {
     private $_userId = null;
 
     /**
+     * Flickr PhotosetList allowed optional parameters
+     *
+     * @var string
+     */
+    protected $allowedParams = ['page', 'per_page', 'primary_photo_extras'];
+
+    /**
      * Constructor
      *
      * The PhotosetList requires a User Id. If $userId is null the class will
@@ -55,9 +62,11 @@ class Phlickr_PhotosetList extends Phlickr_Framework_ListBase {
      * @param   object Phlickr_API $api
      * @param   string $userId User Id. If this isn't provided, the API's User
      *          Id will be used instead.
+     * @param   Array $params Optional arguments that can be passed
+     *          to the API call.
      * @throws  Phlickr_Exception
      */
-    function __construct(Phlickr_Api $api, $userId = null) {
+    function __construct(Phlickr_Api $api, $userId = null, $params = []) {
         if (isset($userId)) {
             $this->_userId = $userId;
         } else {
@@ -67,10 +76,14 @@ class Phlickr_PhotosetList extends Phlickr_Framework_ListBase {
         if (is_null($this->_userId)) {
             throw new Phlickr_Exception('The photoset needs a User Id.');
         }
+
         parent::__construct(
             $api->createRequest(
                 self::getRequestMethodName(),
-                self::getRequestMethodParams($this->_userId)
+                array_merge(
+                    self::getRequestMethodParams($this->_userId),
+                    $this->filterParams($params)
+                )
             ),
             self::XML_RESPONSE_ELEMENT,
             self::XML_RESPONSE_LIST_ELEMENT

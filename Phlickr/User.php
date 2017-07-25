@@ -271,8 +271,8 @@ class Phlickr_User extends Phlickr_Framework_ObjectBase {
      *
      * @return  object Phlickr_PhotosetList
      */
-    public function getPhotosetList() {
-        return new Phlickr_PhotosetList($this->getApi(), $this->getId());
+    public function getPhotosetList($params=[]) {
+        return new Phlickr_PhotosetList($this->getApi(), $this->getId(), $params);
     }
 
     /**

@@ -354,7 +354,7 @@ class Phlickr_Photo extends Phlickr_Framework_ObjectBase {
             array('photo_id' => $this->getId())
         );
         $ret = array();
-        foreach ($resp->xml->sizes->size as $size) {
+        foreach ($resp->data->sizes->size as $size) {
             // convert their label into our constants
             switch ($size['label']) {
             case 'Square':
@@ -383,7 +383,7 @@ class Phlickr_Photo extends Phlickr_Framework_ObjectBase {
                 // if no original is listed (ie no size element with attribute
                 // label="Original", use this in its place. if there is an
                 // original, use this as the large image.
-                if (count($resp->xml->xpath("//size[@label='Original']")) == 1) {
+                if (count($resp->data->xpath("//size[@label='Original']")) == 1) {
                     $index = self::SIZE_1024PX;
                 } else {
                     $index = self::SIZE_ORIGINAL;

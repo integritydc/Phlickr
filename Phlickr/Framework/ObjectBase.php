@@ -53,6 +53,14 @@ abstract class Phlickr_Framework_ObjectBase {
     protected $_cachedXml = null;
 
     /**
+     * Flickr Object allowed optional parameters
+     *
+     * @var string
+     */
+    protected $allowedParams = [];
+
+
+    /**
      * Constructor.
      *
      * The idea with this base class is that you should be able to construct an
@@ -126,7 +134,7 @@ abstract class Phlickr_Framework_ObjectBase {
      */
     protected function requestXml($allowCached = false) {
         $response = $this->getRequest()->execute($allowCached);
-        $xml = $response->xml->{$this->getResponseElement()};
+        $xml = $response->data->{$this->getResponseElement()};
         if (is_null($xml)) {
             throw new Exception("Could not load object with id: '{$this->getId()}'.");
         }
@@ -175,6 +183,18 @@ abstract class Phlickr_Framework_ObjectBase {
      */
     public function getXml() {
         return $this->_cachedXml;
+    }
+
+    /**
+     * Filter out any elements in the supplied array that don't have
+     * a match in the $allowedParams variable.
+     *
+     * @return  array
+     */
+    protected function filterParams($params) {
+        return array_filter($params, function($key) {
+            return in_array($key, $this->allowedParams);
+        }, ARRAY_FILTER_USE_KEY);
     }
     /**
      * Load the complete information on object.

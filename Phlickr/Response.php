@@ -63,11 +63,21 @@ class Phlickr_Response {
     const STAT_FAIL = 'fail';
 
     /**
-     * XML payload of the Response.
+     * Payload of the Response.
      *
-     * @var object SimpleXMLElement
+     * @var object SimpleXMLElement or
+     *      string JSON or
+     *      Array unserialized PHP data
      */
-    var $xml = null;
+    var $data = null;
+
+    /**
+     * Format of the Reponse.
+     *
+     * @var string
+     */
+    private $_format = null;
+
     /**
      * Status of the Reponse.
      *
@@ -99,19 +109,50 @@ class Phlickr_Response {
      *      response indicates failure?
      * @throws Phlickr_XmlParseException, Phlickr_Exception
      */
-    function __construct($restResult, $throwOnFailed = false) {
-        $xml = simplexml_load_string($restResult);
-        if (false === $xml) {
-            throw new Phlickr_XmlParseException('Could not parse XML.', $restResult);
+    function __construct($format, $restResult, $throwOnFailed = false) {
+        $this->_format = $format;
+        switch($this->_format) {
+            case 'rest':
+                $data = simplexml_load_string($restResult);
+                if (false === $data) {
+                    throw new Phlickr_XmlParseException('Could not parse XML.', $restResult);
+                }
+                $this->stat = (string) $data['stat'];
+                if(property_exists($data, 'err')) 
+                {
+                    $this->err_code = (integer) $data->err['code'];
+                    $this->err_msg = (string) $data->err['msg'];
+                }
+                break;
+            case 'json':
+                preg_match('/^jsonFlickrApi\((.*)\)$/', $restResult, $matches);
+                $data = $matches[1];
+                $json = json_decode($data, true);
+                $this->stat = (string) $json['stat'];
+                if(array_key_exists('code', $json)) 
+                {
+                    $this->err_code = (integer) $json['code'];
+                    $this->err_msg = (string) $json['message'];
+                }
+                break;
+            case 'php_serial':
+                $data = unserialize($restResult);
+                if (false === $data) {
+                    throw new Phlickr_UnserializeException('Could not parse the supplied PHP.', $restResult);
+                }
+                $this->stat = (string) $data['stat'];
+                if(array_key_exists('code', $data)) 
+                {
+                    $this->err_code = (integer) $data['code'];
+                    $this->err_msg = (string) $data['message'];
+                }
+                break;
+
         }
 
-        $this->stat = (string) $xml['stat'];
         if ($this->isOk()) {
-            $this->xml = $xml;
+            $this->data = $data;
         } else {
-            $this->err_code = (integer) $xml->err['code'];
-            $this->err_msg = (string) $xml->err['msg'];
-
             if ($throwOnFailed) {
                 throw new Phlickr_MethodFailureException($this->err_msg, $this->err_code);
             }
@@ -119,7 +160,17 @@ class Phlickr_Response {
     }
 
     public function __toString() {
-        return $this->xml->asXML();
+        switch($this->_format) {
+            case 'rest':
+                return $this->data->asXML();
+                break;
+            case 'json':
+                return $this->data;
+                break;
+            case 'php_serial':
+                return serialize($this->data);
+                break;
+        }
     }
 
     /**
@@ -137,8 +188,32 @@ class Phlickr_Response {
      * @return  object SimpleXML
      * @see     SimpleXML::asXML()
      * @since   0.2.3
+     * @todo    Deprecated. Should use getData() from now on.
      */
     public function getXml() {
-        return $this->xml;
+        return $this->getData();
+    }
+
+    /**
+     * Get the data.
+     *
+     * @return  object SimpleXML or
+     *          string JSON or
+     *          Array unseralized PHP
+     *          
+     * @since   0.2.3
+     */
+    public function getData() {
+        switch($this->_format) {
+            case 'rest':
+                return $this->data;
+                break;
+            case 'json':
+                return $this->data;
+                break;
+            case 'php_serial':
+                return $this->data;
+                break;
+        }
     }
 }

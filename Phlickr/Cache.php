@@ -93,7 +93,7 @@ class Phlickr_Cache {
 
     /**
      * Array of cached values. The key is the MD5 hash of the URL and the value
-     * is a string with the XML result.
+     * is a string with the result.
      *
      * @var array
      */
@@ -115,15 +115,27 @@ class Phlickr_Cache {
     private $_shelfLife;
 
     /**
+     * Some query parameters in the URL will always be different,
+     * we can set which query parameters we should ignore.
+     *
+     * @var array
+     * @see getURLFilter(), setURLFilter()
+     */
+    private $_urlFilter = [];
+
+    /**
      * Constructor.
      *
      * @param   integer $shelfLife The default number of seconds to store an
      *          entry.
      * @see     getShelfLife(), DEFAULT_SHELF_LIFE
      */
-    public function __construct($shelfLife = self::DEFAULT_SHELF_LIFE) {
+    public function __construct($shelfLife = self::DEFAULT_SHELF_LIFE, $urlFilter = []) {
         $this->_values = array();
         $this->_expires = array();
+        if(is_array($urlFilter))
+            $this->_urlFilter = $urlFilter;
+
         $this->_shelfLife = (integer) $shelfLife;
     }
 
@@ -153,21 +165,70 @@ class Phlickr_Cache {
     }
 
     /**
+     * Return an array of the query string keys that will be used
+     * as a URL filter.
+     *
+     * @return  array 
+     * @since   0.3
+     * @see     setURLFilter()
+    */
+    public function getURLFilter() {
+        return $this->_urlFilter;
+    }
+
+    /**
+     * Set the array of the query string keys that will be used
+     * as a URL filter.
+     *
+     * @return  array 
+     * @since   0.3
+     * @see     setURLFilter()
+    */
+    public function setURLFilter(array $filter) {
+        $this->_urlFilter = $filter;
+    }
+
+    /**
      * Attempt to retrieve a response from the cache.
      *
-     * If there's a cached response, an XML string that is ready for use with
-     * a Phlickr_Response will be returned. if . If not, return null.
+     * If there's a cached response, a string (XML, JSON, seralized 
+     * PHP) that is ready for use with
+     * a Phlickr_Response will be returned. If not, return null.
      *
      * @param   string $url The Phlickr_Request's complete URL.
-     * @return  string If there's a cached response, an XML string ready for
+     * @return  string If there's a cached response, a string (XML, 
+     *          JSON, seralized PHP) ready for
      *          use with a Phlickr_Response. If not, return null.
      * @since   0.1.6
      * @see     has(), set()
     */
     public function get($url) {
+        $url = $this->filterURL($url);
         if ($this->has($url)) {
             // use MD5 to obscure passwords in the urls
-            return $this->_values[md5($url)];
+            $str = $this->_values[md5($url)];
+            return substr($str, strpos($str, '_')+1);
+        }
+        return null;
+    }
+
+
+    /**
+     * Attempt to retrieve a response's format fromt the cache.
+     *
+     * If there's a cached response, return the type of data stored.
+     *
+     * @param   string $url The Phlickr_Request's complete URL.
+     * @return  string json, php, or rest
+     * @since   0.3
+     * @see     has(), set()
+    */
+    public function getFormat($url) {
+        $url = $this->filterURL($url);
+        if ($this->has($url)) {
+            // use MD5 to obscure passwords in the urls
+            $str = $this->_values[md5($url)];
+            return substr($str, 0, strpos($str, '_'));
         }
         return null;
     }
@@ -206,7 +267,8 @@ class Phlickr_Cache {
      * @since   0.1.6
      * @see     get(), has(), getShelfLife()
     */
-    public function set($url, $response, $shelfLife = null) {
+    public function set($url, $response, $shelfLife = null, $format='rest') {
+        $url = $this->filterURL($url);
         // use MD5 to obscure passwords in the urls
         $md5 = md5($url);
 
@@ -220,7 +282,7 @@ class Phlickr_Cache {
             if ($shelfLife > 0) {
                 $this->_expires[$md5] = time() + $shelfLife;
             }
-            $this->_values[$md5] = $response;
+            $this->_values[$md5] = $format . '_' . $response;
         }
     }
 
@@ -250,6 +312,7 @@ class Phlickr_Cache {
      * @see     get(), set()
      */
     public function has($url) {
+        $url = $this->filterURL($url);
         $md5 = md5($url);
 
         // check if there is an expiration time, and if it has passed
@@ -273,5 +336,29 @@ class Phlickr_Cache {
      */
     public function saveAs($fileName) {
         file_put_contents($fileName, serialize($this));
+    }
+
+    /**
+     * Filter out any parameters in the supplied URL.
+     *
+     * @param   string $url The URL from which we will filter out query
+     *          string parameters.
+     * @return  string
+     * @since   0.3
+     */
+    public function filterURL($url) {
+        $urlArray = parse_url($url);
+        parse_str($urlArray['query'], $qsArray);
+
+        $qsArray = array_filter($qsArray, function($key) {
+            return !in_array($key, $this->_urlFilter);
+        }, ARRAY_FILTER_USE_KEY);
+        $query = http_build_query($qsArray);
+
+        $scheme   = isset($urlArray['scheme']) ? $urlArray['scheme'] . '://' : '';
+        $host     = isset($urlArray['host']) ? $urlArray['host'] : '';
+        $path     = isset($urlArray['path']) ? $urlArray['path'] : '';
+
+        return $scheme . $host . $path . '?' . $query;
     }
 }

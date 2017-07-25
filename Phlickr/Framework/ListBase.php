@@ -45,6 +45,13 @@ abstract class Phlickr_Framework_ListBase implements Phlickr_Framework_IList {
     protected $_respElement;
 
     /**
+     * Flickr List allowed optional parameters
+     *
+     * @var string
+     */
+    protected $allowedParams = [];
+
+    /**
      * Constructor.
      *
      * @param   object Phlickr_Request $request
@@ -60,6 +67,18 @@ abstract class Phlickr_Framework_ListBase implements Phlickr_Framework_IList {
         $this->_respElement = $responseElement;
         $this->_request = $request;
         $this->load();
+    }
+
+    /**
+     * Filter out any elements in the supplied array that don't have
+     * a match in the $allowedParams variable.
+     *
+     * @return  array
+     */
+    protected function filterParams($params) {
+        return array_filter($params, function($key) {
+            return in_array($key, $this->allowedParams);
+        }, ARRAY_FILTER_USE_KEY);
     }
 
     /**
@@ -91,7 +110,7 @@ abstract class Phlickr_Framework_ListBase implements Phlickr_Framework_IList {
      *
      * @return  object Plickr_Api
      */
-    public function &getApi() {
+    public function getApi() {
         return $this->_request->getApi();
     }
     /**
@@ -113,7 +132,7 @@ abstract class Phlickr_Framework_ListBase implements Phlickr_Framework_IList {
      */
     protected function requestXml($allowCached = false) {
         $response = $this->getRequest()->execute($allowCached);
-        $xml = $response->xml->{$this->getResponseListElement()};
+        $xml = $response->data->{$this->getResponseListElement()};
         if (is_null($xml)) {
             throw new Exception(
                 sprintf("Could not load object with request: '%s'.",

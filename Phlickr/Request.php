@@ -345,14 +345,16 @@ class Phlickr_Request {
     {
         $url = $this->buildUrl();
         $cache = $this->getApi()->getCache();
-//print "\nREQUEST: $url\n";
+
         if ($allowCached && $cache->has($url)) {
             $result = $cache->get($url);
+            $format = $cache->getFormat($url);
         } else {
             $result = self::submitHttp($url, $this->getApi()->getHTTPMethod());
             $cache->set($url, $result);
+            $format = $this->getApi()->getFormat();
         }
 //print "RESULT: $result\n";
-        return new Phlickr_Response($result, $this->_throwOnFail);
+        return new Phlickr_Response($format, $result, $this->_throwOnFail);
     }
 }

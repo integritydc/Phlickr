@@ -105,8 +105,8 @@ class Phlickr_AuthedUser extends Phlickr_User {
      *
      * @return  object Phlickr_PhotosetList
      */
-    public function getPhotosetList() {
-        return new Phlickr_AuthedPhotosetList($this->getApi());
+    public function getPhotosetList($params=[]) {
+        return new Phlickr_AuthedPhotosetList($this->getApi(), $params);
     }
 
     /**

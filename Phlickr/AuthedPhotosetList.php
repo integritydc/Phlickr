@@ -28,8 +28,8 @@ class Phlickr_AuthedPhotosetList extends Phlickr_PhotosetList {
      * @param object Phlickr_Api $api This object must have valid
      *      authentication information or an exception will be thrown.
      */
-    function __construct(Phlickr_Api $api) {
-        parent::__construct($api, $api->getUserId());
+    function __construct(Phlickr_Api $api, array $params=[]) {
+        parent::__construct($api, $api->getUserId(), $params);
     }
 
     /**

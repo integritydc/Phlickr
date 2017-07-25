@@ -32,6 +32,13 @@ class Phlickr_Photoset extends Phlickr_Framework_ObjectBase {
     const XML_METHOD_NAME = 'flickr.photosets.getInfo';
 
     /**
+     * Flickr PhotosetList allowed optional parameters
+     *
+     * @var string
+     */
+    protected $allowedParams = ['page', 'per_page', 'privacy_filter', 'media', 'extras'];
+
+    /**
      * Constructor.
      *
      * You can construct a photoset from an Id or XML.
@@ -87,6 +94,20 @@ class Phlickr_Photoset extends Phlickr_Framework_ObjectBase {
     }
 
     /**
+     * Return the primary photo.
+     *
+     * @return  object Phlickr_Photo
+     */
+    public function getPrimaryPhoto($allowCached=false) {
+        $response = $this->getApi()->createRequest(
+            'flickr.photos.getInfo',
+            array('photo_id' => $this->getPrimaryId())
+        )->execute(true);
+
+        return new Phlickr_Photo($this->getApi(), $response->data->photo);
+    }
+
+    /**
      * Return the Photoset's title.
      *
      * @return  string
@@ -133,10 +154,13 @@ class Phlickr_Photoset extends Phlickr_Framework_ObjectBase {
      *
      * @return  object Phlickr_PhotosetPhotoList
      */
-    public function getPhotoList() {
+    public function getPhotoList($params) {
         $req = $this->getApi()->createRequest(
             'flickr.photosets.getPhotos',
-            array('photoset_id' => $this->getId())
+            array_merge(
+                self::getRequestMethodParams($this->getId()),
+                $this->filterParams($params)
+            )
         );
         return new Phlickr_PhotosetPhotoList($req);
     }

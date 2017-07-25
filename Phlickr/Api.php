@@ -96,6 +96,13 @@ class Phlickr_Api {
     const SETTING_API_CACHE = 'cache_file';
 
     /**
+     * The format to request for our responses.
+     *
+     * @var string
+     * @see getFormat(), setFormat()
+     */
+    private $_format = 'rest';
+    /**
      * The API HTTP method we will use.
      *
      * @var string
@@ -175,6 +182,14 @@ class Phlickr_Api {
     private $_userId = null;
 
     /**
+     * These keys are different for each URL and would break
+     * all caching.
+     *
+     * @var array
+     */
+    private $_nonCachedKeys = ['oauth_nonce', 'oauth_timestamp', 'oauth_signature'];
+
+    /**
      * Constructor.
      *
      * @param   string $key Flickr API key.
@@ -182,7 +197,7 @@ class Phlickr_Api {
      * @param   string $token
      * @see     getKey(), getSecret(), getAuthToken(), setAuthToken()
      */
-    public function __construct($key, $secret, $token = null) {
+    public function __construct($key, $secret, $token = null, $format='xml') {
         // key (required)
         if (isset($key)) {
             $this->_key = (string) $key;
@@ -199,7 +214,12 @@ class Phlickr_Api {
         if (isset($token)) {
             $this->_token = (string) $token;
         }
+        // format
+        if (isset($_format)) {
+            $this->setFormat($format);
+        }
         $this->_cache = new Phlickr_Cache();
+        $this->_cache->setURLFilter($this->_nonCachedKeys);
     }
     /**
      * Destructor. If a cache filename is set, save the contents of the cache
@@ -355,19 +375,49 @@ class Phlickr_Api {
      * @param   string $method Name of Flickr API method.
      * @param   array $params Array of parameters. The ordering isn't important,
      *          they'll be sorted when building the request.
-     * @param   string $xml The XML return. This should be the payload, i.e.
-     *          everything in the <resp></resp> element.
+     * @param   string $data The return. This can be XML, JSON, or serialized
+     *          PHP.
      * @return  void
      * @uses    Phlickr_Request::buildUrl() to construct the URL that the cache
      *          uses as a key.
      * @uses    Phlickr_Cache::set() to store the results in the cache.
     */
-    public function addResponseToCache($method, $params, $xml) {
+    public function addResponseToCache($method, $params, $data) {
         $url = $this->createRequest($method, $params)->buildUrl();
-//print "\nCACHED : $url\n";
-        $this->_cache->set($url, $xml);
+        $this->_cache->set($url, $data, null, $this->getFormat());
     }
 
+    /**
+     * Return the format that will be requested.
+     *
+     * @return  string
+     * @see     __construct(), setFormat()
+     */
+    public function getFormat() {
+        return $this->_format;
+    }
+    /**
+     * Set the format that will be requested.
+     *
+     * @param   string $format
+     * @return  void
+     * @see     __construct(), getFormat()
+     */
+    public function setFormat($format) {
+        switch(strtolower($format)) {
+            case 'rest':
+            case 'xml':
+                $this->_format = 'rest';
+                break;
+            case 'json':
+                $this->_format = 'json';
+                break;
+            case 'php':
+                $this->_format = 'php_serial';
+                break;
+        }
+        $this->_format = (string) $format;
+    }
     /**
      * Get the HTTP Method we will be using.
      *
@@ -529,8 +579,9 @@ class Phlickr_Api {
         if (is_null($this->_userId)) {
             try {
                 $response = $this->executeMethod('flickr.auth.oauth.checkToken');
-                $this->_userId = (string) $response->xml->oauth->user['nsid'];
+                $this->_userId = (string) $response->data->oauth->user['nsid'];
             } catch (Phlickr_Exception $ex) {
+                dd($ex);
                 // invalid login (or connection problem)
                 $this->_userId = null;
             }
@@ -546,6 +597,7 @@ class Phlickr_Api {
      */
     public function getParamsForRequest() {
         $params = [
+            'format'=>$this->getFormat(),
             'oauth_callback'=>$this->_callback_url,
             'oauth_consumer_key'=>$this->_key,
             'oauth_nonce'=>random_int(100, 300) . uniqid(),
