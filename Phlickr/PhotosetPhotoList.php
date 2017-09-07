@@ -58,6 +58,7 @@ class Phlickr_PhotosetPhotoList extends Phlickr_Framework_ListBase
     static function getRequestMethodName() {
         return self::XML_METHOD_NAME;
     }
+
     /**
      * Returns an array of parameters to be used when creating a
      * Phlickr_Request to call this object's getInfo API method.
@@ -70,9 +71,61 @@ class Phlickr_PhotosetPhotoList extends Phlickr_Framework_ListBase
     }
 
     /**
+     * Return the number of results per page.
+     *
+     * @return  integer
+     */
+    public function getPerPage() {
+        if (!isset($this->_cachedXml->photo)) {
+            $this->load();
+        }
+        return (int) $this->_cachedXml['per_page'];
+    }
+
+    /**
+     * Return the current page.
+     *
+     * @return  integer
+     */
+    public function getPage() {
+        if (!isset($this->_cachedXml->photo)) {
+            $this->load();
+        }
+        return (int) $this->_cachedXml['page'];
+    }
+
+    /**
+     * Return the total number of pages.
+     *
+     * @return  integer
+     */
+    public function getPages() {
+        if (!isset($this->_cachedXml->photo)) {
+            $this->load();
+        }
+        return (int) $this->_cachedXml['pages'];
+    }
+
+    /**
+     * Return the total number of photos in the photoset.
+     *
+     * The count on a Photoset should always be 1 or more. 
+     *
+     * @return  integer
+     */
+    public function getTotal() {
+        if (!isset($this->_cachedXml->photo)) {
+            $this->load();
+        }
+        return (int) $this->_cachedXml['total'];
+    }
+
+    /**
      * Return the number of photos in the photoset.
      *
-     * The count on a Photoset should always be 1 or more.
+     * The count on a Photoset should always be 1 or more. If this
+     * is a paginated set, it does not return the total. It returns
+     * the total in this subset.
      *
      * @return  integer
      */
@@ -80,11 +133,7 @@ class Phlickr_PhotosetPhotoList extends Phlickr_Framework_ListBase
         if (!isset($this->_cachedXml->photo)) {
             $this->load();
         }
-        $ret = 0;
-        foreach ($this->_cachedXml->photo as $xml) {
-            $ret++;
-        }
-        return $ret;
+        return (int) $this->_cachedXml->photo->count();
     }
 
     public function getPhotos() {
